@@ -230,12 +230,7 @@ class GsUsb:
         :return: list of gs_usb devices handle
         """
         return [
-            GsUsb(dev)
-            for dev in usb.core.find(
-                find_all=True,
-                custom_match = cls.is_gs_usb_device,
-                backend=libusb1.get_backend(),
-            )
+            GsUsb(usb.core.find(idVendor=0x0483, idProduct=0xA30E))
         ]
 
     @classmethod
