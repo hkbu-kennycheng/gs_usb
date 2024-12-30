@@ -22,6 +22,9 @@ GS_USB_CES_CANEXT_FD_PRODUCT_ID = 0x606F
 GS_USB_ABE_CANDEBUGGER_FD_VENDOR_ID = 0x16D0
 GS_USB_ABE_CANDEBUGGER_FD_PRODUCT_ID = 0x10B8
 
+GS_USB_SPARKMAX_VENDOR_ID = 0x0483
+GS_USB_SPARKMAX_PRODUCT_ID = 0xA30E
+
 #gs_usb mode
 GS_CAN_MODE_RESET = 0
 GS_CAN_MODE_START = 1
@@ -50,10 +53,14 @@ class GsUsb:
         self.gs_usb.reset()
 
         # Detach usb from kernel driver in Linux/Unix system to perform IO
-        if "windows" not in platform.system().lower() and self.gs_usb.is_kernel_driver_active(
-            0
-        ):
-            self.gs_usb.detach_kernel_driver(0)
+        #if "windows" not in platform.system().lower() and self.gs_usb.is_kernel_driver_active(
+        #    0
+        #):
+        #    self.gs_usb.detach_kernel_driver(0)
+        if "windows" not in platform.system().lower():
+            for i in range(0, self.gs_usb.bNumConfigurations):
+                if self.gs_usb.is_kernel_driver_active(i):
+                    self.gs_usb.detach_kernel_driver(i)
 
         #Only allow features that the device supports
         flags &= self.device_capability.feature
@@ -218,10 +225,17 @@ class GsUsb:
             return ""
         return _
 
-    is_gs_usb_device = staticmethod(lambda dev : (dev.idVendor == GS_USB_ID_VENDOR and dev.idProduct == GS_USB_ID_PRODUCT)\
-            or (dev.idVendor == GS_USB_CANDLELIGHT_VENDOR_ID and dev.idProduct == GS_USB_CANDLELIGHT_PRODUCT_ID) \
-            or (dev.idVendor == GS_USB_CES_CANEXT_FD_VENDOR_ID and dev.idProduct == GS_USB_CES_CANEXT_FD_PRODUCT_ID) \
-            or (dev.idVendor == GS_USB_ABE_CANDEBUGGER_FD_VENDOR_ID and dev.idProduct == GS_USB_ABE_CANDEBUGGER_FD_PRODUCT_ID)) \
+    @staticmethod
+    def is_gs_usb_device(dev):
+        r"""
+        Check if the device is a gs_usb device
+        :param dev: usb device
+        :return: True if the device is a gs_usb device
+        """
+        devices = [f"{GS_USB_ID_VENDOR}:{GS_USB_ID_PRODUCT}", f"{GS_USB_CANDLELIGHT_VENDOR_ID}:{GS_USB_CANDLELIGHT_PRODUCT_ID}",
+                   f"{GS_USB_CES_CANEXT_FD_VENDOR_ID}:{GS_USB_CES_CANEXT_FD_PRODUCT_ID}", f"{GS_USB_ABE_CANDEBUGGER_FD_VENDOR_ID}:{GS_USB_ABE_CANDEBUGGER_FD_PRODUCT_ID}",
+                   f"{GS_USB_SPARKMAX_VENDOR_ID}:{GS_USB_SPARKMAX_PRODUCT_ID}"]
+        return f"{dev.idVendor}:{dev.idProduct}" in devices
 
     @classmethod
     def scan(cls):
@@ -230,7 +244,12 @@ class GsUsb:
         :return: list of gs_usb devices handle
         """
         return [
-            GsUsb(usb.core.find(idVendor=0x0483, idProduct=0xA30E))
+            GsUsb(dev)
+            for dev in usb.core.find(
+                find_all=True,
+                custom_match = cls.is_gs_usb_device,
+                backend=libusb1.get_backend(),
+            )
         ]
 
     @classmethod
